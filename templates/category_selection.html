@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select Department</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .error {
+            color: #d32f2f;
+            margin-bottom: 20px;
+        }
+        .info {
+            background-color: #dbeafe;
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-top: 15px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        label:hover {
+            border-color: #0ea5e9;
+            background-color: #f5f5f5;
+        }
+        input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0284c7;
+        }
+        a {
+            display: inline-block;
+            margin-top: 15px;
+            color: #0ea5e9;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Department Selection</h1>
+        
+        <div class="info">
+            <p>We couldn't automatically categorize your issue. Please select one or more departments that best match your request:</p>
+        </div>
+
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+
+        <form action="/select_category" method="POST">
+            {% for dept in departments %}
+                <label>
+                    <input type="checkbox" name="category" value="{{ dept }}">
+                    <strong>{{ dept }}</strong>
+                </label>
+            {% endfor %}
+            
+            <button type="submit">Submit</button>
+        </form>
+
+        <a href="/">Cancel</a>
+    </div>
+</body>
+</html>
