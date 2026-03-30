@@ -72,7 +72,7 @@ def init_db():
 # NOTE: init_db() will run after get_db and migrate_db are defined.
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'
+app.secret_key = os.environ.get("SECRET_KEY", "your-secret-key-here")
 
 # Login required decorator
 def login_required(f):
@@ -105,7 +105,10 @@ def admin_required(f):
 DEPARTMENTS = ["IT", "Finance", "HR", "Operations"]
 
 # DATABASE
-DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), "tickets.db")
+DB_PATH = os.environ.get(
+    "DB_PATH",
+    "/tmp/tickets.db" if os.environ.get("VERCEL", "0") == "1" else os.path.join(os.path.abspath(os.path.dirname(__file__)), "tickets.db")
+)
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -572,4 +575,9 @@ def update_status(ticket_id):
 
     return redirect(url_for('view'))
 
-app.run(debug=True)
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=os.environ.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes"),
+    )
