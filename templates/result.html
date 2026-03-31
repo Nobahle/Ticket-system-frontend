@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ticket Result</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 750px;
+            margin: 50px auto;
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+            border-radius: 10px;
+            padding: 25px;
+        }
+        h2 {
+            margin: 0 0 20px;
+            color: #333;
+            font-size: 28px;
+            text-align: center;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 10px;
+        }
+        .card h3 {
+            margin: 0 0 10px;
+            color: #444;
+            font-size: 18px;
+        }
+        .card p {
+            margin: 8px 0;
+            color: #555;
+            line-height: 1.5;
+        }
+        .badge {
+            display: inline-block;
+            background-color: #5e72e4;
+            color: white;
+            border-radius: 14px;
+            padding: 5px 12px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .footer a {
+            background-color: #5e72e4;
+            color: white;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .footer a:hover {
+            background-color: #4c63d4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Ticket Submitted</h2>
+
+        <div class="card">
+            <h3>Assigned Department(s)</h3>
+            <p>
+                {% if categories is string %}
+                    {{ categories }}
+                {% else %}
+                    {{ categories | join(", ") }}
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="card">
+            <h3>Response</h3>
+            <p>{{ response }}</p>
+            <p><strong>Tone:</strong> {{ tone }}</p>
+        </div>
+
+        <div class="footer">
+            <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>

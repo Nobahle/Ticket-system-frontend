@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ticket System - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        h1 {
+            font-size: 24px;
+        }
+        
+        .user-info {
+            font-size: 14px;
+        }
+        
+        .badge {
+            background-color: rgba(255, 255, 255, 0.3);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .logout-btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        
+        .form-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        .form-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: border-color 0.3s ease;
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #5e72e4;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .tickets-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tickets-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .no-tickets {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+        
+        .ticket-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            background-color: #fafafa;
+        }
+        
+        .ticket-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+        
+        .ticket-id {
+            background-color: #5e72e4;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-open {
+            background-color: #ffd662;
+            color: #7a5802;
+        }
+        
+        .status-inprogress {
+            background-color: #74c0fc;
+            color: #002155;
+        }
+        
+        .status-closed {
+            background-color: #51cf66;
+            color: #0a3c1f;
+        }
+        
+        .ticket-category {
+            margin: 10px 0;
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .ticket-text {
+            color: #333;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: white;
+            border-left: 3px solid #5e72e4;
+        }
+        
+        .ticket-response {
+            color: #555;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        .ticket-meta {
+            color: #999;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .admin-notice {
+            background-color: #dbeafe;
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            color: #0369a1;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <h1>🎫 Ticket System</h1>
+            <div class="user-info">
+                <div>Welcome, <strong>{{ username }}</strong></div>
+                <div><span class="badge">{{ role.upper() }}</span></div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+    </header>
+    
+    <div class="container">
+        {% if role == 'user' %}
+        <div class="form-section">
+            <h2>Submit a New Ticket</h2>
+            <form action="/submit" method="POST">
+                <div class="form-group">
+                    <label for="ticket">Describe your issue:</label>
+                    <textarea name="ticket" id="ticket" placeholder="Describe your problem or request..." required></textarea>
+                </div>
+                <button type="submit">Submit Ticket</button>
+                <a href="{{ url_for('view') }}" style="margin-left: 15px; text-decoration: none; font-weight: bold; color: #5e72e4;">View My Tickets</a>
+            </form>
+        </div>
+        {% endif %}
+        
+        {% if role == 'admin' %}
+        
+            <!-- WEEKLY INSIGHTS SECTION -->
+            <div class="form-section">
+                <h2>📈 Weekly Summary (Last 7 Days)</h2>
+                {% if weekly_insights %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: bold;">{{ weekly_insights.total }}</div>
+                        <div style="font-size: 13px; margin-top: 5px;">Total Tickets</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #f24c63 0%, #ff6b9d 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: bold;">{{ weekly_insights.resolved }}</div>
+                        <div style="font-size: 13px; margin-top: 5px;">Resolved</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: bold;">{{ weekly_insights.closure_rate }}</div>
+                        <div style="font-size: 13px; margin-top: 5px;">Closure Rate</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #ffa500 0%, #ff6b6b 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: bold;">{{ weekly_insights.users_submitted }}</div>
+                        <div style="font-size: 13px; margin-top: 5px;">Users Submitted</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                    <div style="border: 2px solid #ffd662; padding: 12px; border-radius: 6px; text-align: center; background: #fffbeb;">
+                        <div style="font-size: 18px; font-weight: bold; color: #d47706;">{{ weekly_insights.open }}</div>
+                        <div style="font-size: 12px; color: #92400e;">Open</div>
+                    </div>
+                    <div style="border: 2px solid #74c0fc; padding: 12px; border-radius: 6px; text-align: center; background: #eff6ff;">
+                        <div style="font-size: 18px; font-weight: bold; color: #0369a1;">{{ weekly_insights.in_progress }}</div>
+                        <div style="font-size: 12px; color: #0c4a6e;">In Progress</div>
+                    </div>
+                    <div style="border: 2px solid #51cf66; padding: 12px; border-radius: 6px; text-align: center; background: #f0fdf4;">
+                        <div style="font-size: 18px; font-weight: bold; color: #166534;">{{ weekly_insights.closed }}</div>
+                        <div style="font-size: 12px; color: #15803d;">Closed</div>
+                    </div>
+                    <div style="border: 2px solid #5e72e4; padding: 12px; border-radius: 6px; text-align: center; background: #eef2ff;">
+                        <div style="font-size: 18px; font-weight: bold; color: #3730a3;">{{ weekly_insights.top_department }}</div>
+                        <div style="font-size: 12px; color: #5b21b6;">Top Department</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        
+            <!-- ANALYTICS SECTION -->
+            <div class="form-section">
+                <h2>📊 Department Analytics</h2>
+                {% if analytics %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    {% for dept, stats in analytics.items() %}
+                    <div style="border: 2px solid #5e72e4; border-radius: 8px; padding: 15px; background: linear-gradient(135deg, rgba(94, 114, 228, 0.1) 0%, rgba(130, 94, 228, 0.1) 100%);">
+                        <h3 style="color: #5e72e4; margin-bottom: 10px;">{{ dept }}</h3>
+                        <div style="font-size: 13px;">
+                            <div style="margin: 8px 0;"><strong>Total Tickets:</strong> <span style="color: #333; font-weight: bold;">{{ stats.total }}</span></div>
+                            <div style="margin: 8px 0;"><span style="background: #ffd662; padding: 3px 8px; border-radius: 3px; color: #7a5802; font-weight: 500;">Open:</span> {{ stats.open }}</div>
+                            <div style="margin: 8px 0;"><span style="background: #74c0fc; padding: 3px 8px; border-radius: 3px; color: #002155; font-weight: 500;">In Progress:</span> {{ stats.in_progress }}</div>
+                            <div style="margin: 8px 0;"><span style="background: #51cf66; padding: 3px 8px; border-radius: 3px; color: #0a3c1f; font-weight: 500;">Closed:</span> {{ stats.closed }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: #999;">No analytics data available.</p>
+                {% endif %}
+            </div>
+        
+            <!-- TICKETS SECTION -->
+            <div class="tickets-section">
+                <h2>All Tickets</h2>
+                
+                {% if tickets %}
+                    {% for ticket in tickets %}
+                        <div class="ticket-item">
+                            <div class="ticket-header">
+                                <div>
+                                    <span class="ticket-id">Ticket #{{ ticket[0] }}</span>
+                                    <span style="color: #666; font-size: 13px; margin-left: 10px;"><strong>By:</strong> {{ ticket[-1] or 'System' }}</span>
+                                </div>
+                                <div>
+                                    <span class="status-badge {% if ticket[6] == 'Open' %}status-open{% elif ticket[6] == 'Closed' %}status-closed{% else %}status-open{% endif %}">
+                                        {{ ticket[6] }}
+                                    </span>
+                                    <form method="POST" action="{{ url_for('update_status', ticket_id=ticket[0]) }}" style="display: inline; margin-left: 10px;">
+                                        <select name="status" style="padding: 4px; font-size:12px;">
+                                            <option value="Open" {% if ticket[6] == 'Open' %}selected{% endif %}>Open</option>
+                                            <option value="In Progress" {% if ticket[6] == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                            <option value="Closed" {% if ticket[6] == 'Closed' %}selected{% endif %}>Closed</option>
+                                        </select>
+                                        <button type="submit" class="delete-btn" style="background-color:#0ea5e9; margin-left: 5px;">Update</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('delete_ticket', ticket_id=ticket[0]) }}" style="display: inline; margin-left: 10px;" onsubmit="return confirm('Are you sure you want to delete this ticket?')">
+                                        <button type="submit" class="delete-btn">Delete</button>
+                                    </form>
+                                </div>
+                            </div>
+                            
+                            <div class="ticket-category">
+                                <strong>Category:</strong> {{ ticket[2] }}
+                            </div>
+                            
+                            <div class="ticket-text">
+                                <strong>Issue:</strong><br>
+                                {{ ticket[1] }}
+                            </div>
+                            
+                            <div class="ticket-response">
+                                <strong>Response:</strong><br>
+                                {{ ticket[4] }}
+                            </div>
+                            
+                            <div class="ticket-meta">
+                                Created: {{ ticket[7] }} | Tone: {{ ticket[3] }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-tickets">
+                        <p>No tickets found.</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
