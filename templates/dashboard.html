@@ -238,7 +238,12 @@
                 <div><span class="badge">{{ role.upper() }}</span></div>
             </div>
         </div>
-        <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            {% if role == 'admin' %}
+            <a href="{{ url_for('reports') }}" class="logout-btn" style="background-color: rgba(255, 255, 255, 0.2);">📊 Reports</a>
+            {% endif %}
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
     </header>
     
     <div class="container">

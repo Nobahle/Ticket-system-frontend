@@ -1,10 +1,16 @@
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, session, redirect, url_for, send_file
 import sqlite3
 import string
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+import openpyxl
+from io import BytesIO
 
 IT_KEYWORDS = [
     "password","computer","wifi","laptop","printer","email",
@@ -574,6 +580,205 @@ def update_status(ticket_id):
     conn.close()
 
     return redirect(url_for('view'))
+
+# REPORTS PAGE
+@app.route("/reports", methods=["GET", "POST"])
+@login_required
+@admin_required
+def reports():
+    if request.method == "POST":
+        department = request.form.get('department', 'All')
+        date_from = request.form.get('date_from')
+        date_to = request.form.get('date_to')
+        report_format = request.form.get('format', 'pdf')
+        
+        # Generate report based on format
+        if report_format == 'pdf':
+            return generate_pdf_report(department, date_from, date_to)
+        elif report_format == 'csv':
+            return generate_csv_report(department, date_from, date_to)
+    
+    return render_template("reports.html", departments=DEPARTMENTS)
+
+# Generate PDF Report
+def generate_pdf_report(department, date_from, date_to):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Title
+    title = Paragraph(f"Ticket System Report - {department} Department", styles['Title'])
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+    
+    # Date range
+    date_range = f"Period: {date_from} to {date_to}" if date_from and date_to else "All time"
+    elements.append(Paragraph(date_range, styles['Normal']))
+    elements.append(Spacer(1, 12))
+    
+    # Get data
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT t.id, t.ticket_text, t.category, t.tone, t.status, t.created_at, u.username
+        FROM tickets t
+        LEFT JOIN users u ON t.user_id = u.id
+    """
+    params = []
+    
+    if department != 'All':
+        query += " WHERE t.category LIKE ?"
+        params.append(f'%{department}%')
+    
+    if date_from and date_to:
+        if 'WHERE' in query:
+            query += " AND DATE(t.created_at) BETWEEN ? AND ?"
+        else:
+            query += " WHERE DATE(t.created_at) BETWEEN ? AND ?"
+        params.extend([date_from, date_to])
+    
+    query += " ORDER BY t.created_at DESC"
+    
+    cursor.execute(query, params)
+    tickets = cursor.fetchall()
+    
+    # Summary stats
+    total_tickets = len(tickets)
+    open_count = sum(1 for t in tickets if t[4] == 'Open')
+    in_progress_count = sum(1 for t in tickets if t[4] == 'In Progress')
+    closed_count = sum(1 for t in tickets if t[4] == 'Closed')
+    
+    # Summary table
+    summary_data = [
+        ['Metric', 'Value'],
+        ['Total Tickets', str(total_tickets)],
+        ['Open', str(open_count)],
+        ['In Progress', str(in_progress_count)],
+        ['Closed', str(closed_count)]
+    ]
+    
+    summary_table = Table(summary_data)
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(Paragraph("Summary", styles['Heading2']))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 20))
+    
+    # Tickets table
+    if tickets:
+        ticket_data = [['ID', 'Ticket Text', 'Category', 'Tone', 'Status', 'Created', 'User']]
+        for ticket in tickets[:50]:  # Limit to 50 for PDF
+            ticket_data.append([
+                str(ticket[0]),
+                ticket[1][:50] + '...' if len(ticket[1]) > 50 else ticket[1],
+                ticket[2],
+                ticket[3],
+                ticket[4],
+                ticket[5][:10],  # Date only
+                ticket[6] or 'System'
+            ])
+        
+        ticket_table = Table(ticket_data)
+        ticket_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        elements.append(Paragraph("Ticket Details", styles['Heading2']))
+        elements.append(ticket_table)
+    
+    conn.close()
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"ticket_report_{department}_{datetime.now().strftime('%Y%m%d')}.pdf",
+        mimetype='application/pdf'
+    )
+
+# Generate CSV Report
+def generate_csv_report(department, date_from, date_to):
+    from io import StringIO
+    import csv
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow(['ID', 'Ticket Text', 'Category', 'Tone', 'Status', 'Created At', 'User'])
+    
+    # Get data
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT t.id, t.ticket_text, t.category, t.tone, t.status, t.created_at, u.username
+        FROM tickets t
+        LEFT JOIN users u ON t.user_id = u.id
+    """
+    params = []
+    
+    if department != 'All':
+        query += " WHERE t.category LIKE ?"
+        params.append(f'%{department}%')
+    
+    if date_from and date_to:
+        if 'WHERE' in query:
+            query += " AND DATE(t.created_at) BETWEEN ? AND ?"
+        else:
+            query += " WHERE DATE(t.created_at) BETWEEN ? AND ?"
+        params.extend([date_from, date_to])
+    
+    query += " ORDER BY t.created_at DESC"
+    
+    cursor.execute(query, params)
+    tickets = cursor.fetchall()
+    
+    for ticket in tickets:
+        writer.writerow([
+            ticket[0],
+            ticket[1],
+            ticket[2],
+            ticket[3],
+            ticket[4],
+            ticket[5],
+            ticket[6] or 'System'
+        ])
+    
+    conn.close()
+    
+    output.seek(0)
+    buffer = BytesIO()
+    buffer.write(output.getvalue().encode('utf-8'))
+    buffer.seek(0)
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"ticket_report_{department}_{datetime.now().strftime('%Y%m%d')}.csv",
+        mimetype='text/csv'
+    )
 
 if __name__ == "__main__":
     app.run(
