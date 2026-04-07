@@ -584,24 +584,131 @@ def update_status(ticket_id):
 
     return redirect(url_for('view'))
 
-# REPORTS PAGE
-@app.route("/reports", methods=["GET", "POST"])
-@login_required
-@admin_required
-def reports():
-    if request.method == "POST":
-        department = request.form.get('department', 'All')
-        date_from = request.form.get('date_from')
-        date_to = request.form.get('date_to')
-        report_format = request.form.get('format', 'pdf')
-        
-        # Generate report based on format
-        if report_format == 'pdf':
-            return generate_pdf_report(department, date_from, date_to)
-        elif report_format == 'csv':
-            return generate_csv_report(department, date_from, date_to)
+# ANALYSIS HELPER FUNCTIONS
+def analyze_trends(tickets, date_from=None, date_to=None):
+    """Analyze ticket trends over time periods"""
+    from datetime import datetime, timedelta
     
-    return render_template("reports.html", departments=DEPARTMENTS)
+    trends = {
+        'total_change': 0,
+        'closure_trend': [],
+        'urgent_volume': 0,
+        'avg_resolution_time': 0,
+        'department_trends': {}
+    }
+    
+    if not tickets:
+        return trends
+    
+    # Get current week and previous week
+    today = datetime.now()
+    current_week_start = today - timedelta(days=today.weekday())
+    prev_week_start = current_week_start - timedelta(days=7)
+    
+    current_week_tickets = [t for t in tickets if datetime.strptime(t[5][:10], '%Y-%m-%d') >= current_week_start.date()]
+    prev_week_tickets = [t for t in tickets if prev_week_start.date() <= datetime.strptime(t[5][:10], '%Y-%m-%d') < current_week_start.date()]
+    
+    # Calculate week-over-week change
+    if prev_week_tickets:
+        prev_total = len(prev_week_tickets)
+        curr_total = len(current_week_tickets)
+        trends['total_change'] = ((curr_total - prev_total) / prev_total * 100) if prev_total > 0 else 0
+    
+    # Urgent tickets volume
+    urgent = sum(1 for t in tickets if t[3] == 'Urgent')
+    trends['urgent_volume'] = urgent
+    
+    # Closure trend by department
+    dept_totals = {}
+    dept_closed = {}
+    for ticket in tickets:
+        dept = ticket[2] or 'Unassigned'
+        dept_totals[dept] = dept_totals.get(dept, 0) + 1
+        if ticket[4] == 'Closed':
+            dept_closed[dept] = dept_closed.get(dept, 0) + 1
+    
+    for dept in dept_totals:
+        closure_rate = (dept_closed.get(dept, 0) / dept_totals[dept] * 100) if dept_totals[dept] > 0 else 0
+        trends['department_trends'][dept] = {'closure_rate': closure_rate, 'total': dept_totals[dept]}
+    
+    return trends
+
+def generate_insights(tickets, dept_stats, trends):
+    """Generate business insights from analysis"""
+    insights = []
+    
+    if not tickets:
+        return insights
+    
+    total = len(tickets)
+    closed = sum(1 for t in tickets if t[4] == 'Closed')
+    open_tickets = sum(1 for t in tickets if t[4] == 'Open')
+    urgent = sum(1 for t in tickets if t[3] == 'Urgent')
+    
+    # Insight 1: Overall closure rate
+    closure_rate = (closed / total * 100) if total > 0 else 0
+    if closure_rate > 75:
+        insights.append({
+            'title': '✅ Excellent Performance',
+            'message': f'Closure rate is {closure_rate:.1f}%. The team is resolving tickets efficiently.',
+            'type': 'positive'
+        })
+    elif closure_rate < 50:
+        insights.append({
+            'title': '⚠️ Low Closure Rate',
+            'message': f'Only {closure_rate:.1f}% of tickets are closed. Consider reviewing bottlenecks.',
+            'type': 'warning'
+        })
+    
+    # Insight 2: Backlog analysis
+    if open_tickets > total * 0.3:
+        insights.append({
+            'title': '⚠️ High Open Backlog',
+            'message': f'{open_tickets} tickets ({(open_tickets/total*100):.1f}%) remain open. Prioritize resolution.',
+            'type': 'warning'
+        })
+    
+    # Insight 3: Urgent tickets
+    if urgent > 0:
+        urgent_pct = (urgent / total * 100)
+        if urgent_pct > 20:
+            insights.append({
+                'title': '🔴 High Urgency Volume',
+                'message': f'{urgent} urgent tickets ({urgent_pct:.1f}%) detected. Review escalation procedures.',
+                'type': 'alert'
+            })
+        else:
+            insights.append({
+                'title': '✓ Managed Urgency',
+                'message': f'{urgent} urgent tickets. Healthy urgent-to-total ratio.',
+                'type': 'positive'
+            })
+    
+    # Insight 4: Department performance
+    best_dept = max(dept_stats.items(), key=lambda x: x[1]['closure_rate'] if x[1]['total'] > 0 else 0, default=(None, None))[0]
+    if best_dept:
+        best_rate = dept_stats[best_dept].get('closure_rate', 0) if dept_stats[best_dept]['total'] > 0 else 0
+        insights.append({
+            'title': f'🏆 Top Performer: {best_dept}',
+            'message': f'{best_dept} department leads with {best_rate:.1f}% closure rate.',
+            'type': 'positive'
+        })
+    
+    # Insight 5: Trends
+    if trends['total_change'] > 10:
+        insights.append({
+            'title': '📈 Increasing Volume',
+            'message': f'Ticket volume increased {trends["total_change"]:.1f}% week-over-week. Monitor capacity.',
+            'type': 'warning'
+        })
+    elif trends['total_change'] < -10:
+        insights.append({
+            'title': '📉 Decreasing Volume',
+            'message': f'Ticket volume decreased {abs(trends["total_change"]):.1f}% week-over-week.',
+            'type': 'positive'
+        })
+    
+    return insights
 
 # Generate PDF Report
 def generate_pdf_report(department, date_from, date_to):
@@ -716,6 +823,44 @@ def generate_pdf_report(department, date_from, date_to):
     elements.append(Table([card_cells], colWidths=[2.1*inch] * len(card_cells), hAlign='LEFT', spaceBefore=10, spaceAfter=20))
     elements.append(Spacer(1, 5))
     elements.append(Paragraph("Key performance indicators are shown in the cards above. These summarize ticket volume, urgency, and closure success.", ParagraphStyle('SummaryFooter', parent=styles['BodyText'], fontSize=10, textColor=colors.grey, spaceAfter=10)))
+    
+    # Generate trends and insights
+    trends = analyze_trends(tickets, date_from, date_to)
+    
+    # Calculate closure rates for dept_stats
+    for dept in dept_stats:
+        if dept_stats[dept]['total'] > 0:
+            dept_stats[dept]['closure_rate'] = (dept_stats[dept]['closed'] / dept_stats[dept]['total'] * 100)
+        else:
+            dept_stats[dept]['closure_rate'] = 0
+    
+    insights = generate_insights(tickets, dept_stats, trends)
+    
+    # Add insights section
+    elements.append(PageBreak())
+    elements.append(Paragraph("GENERATED INSIGHTS", title_style))
+    elements.append(Spacer(1, 20))
+    
+    if insights:
+        for insight in insights:
+            insight_color = colors.HexColor('#10b981') if insight['type'] == 'positive' else (colors.HexColor('#f59e0b') if insight['type'] == 'warning' else colors.HexColor('#ef4444'))
+            
+            insight_box = Table([[
+                Paragraph(f"<b>{insight['title']}</b><br/>{insight['message']}", ParagraphStyle('InsightText', parent=styles['BodyText'], fontSize=10, textColor=colors.white))
+            ]], colWidths=[6.5*inch])
+            insight_box.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), insight_color),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.white),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ]))
+            elements.append(insight_box)
+            elements.append(Spacer(1, 10))
+    else:
+        elements.append(Paragraph("No insights generated. More data is needed for analysis.", normal_style))
+    
     elements.append(PageBreak())
     
     # ===== DEPARTMENT OVERVIEW =====
