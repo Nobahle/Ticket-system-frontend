@@ -782,56 +782,62 @@ def generate_pdf_report(department, date_from, date_to):
     elements.append(Spacer(1, 20))
     
     if total_tickets > 0:
-        drawing = Drawing(500, 280)
-        
         # Pie Chart
+        pie_drawing = Drawing(280, 220)
         pie = Pie()
         pie.x = 30
-        pie.y = 50
-        pie.width = 150
-        pie.height = 150
-        pie.data = [open_count if open_count > 0 else 0.1, in_progress_count if in_progress_count > 0 else 0.1, closed_count if closed_count > 0 else 0.1]
+        pie.y = 30
+        pie.width = 180
+        pie.height = 180
+        pie.data = [open_count if open_count > 0 else 1, in_progress_count if in_progress_count > 0 else 1, closed_count if closed_count > 0 else 1]
         pie.labels = ['Open', 'In Progress', 'Closed']
-        pie.slices.strokeWidth = 0.5
+        pie.slices.strokeWidth = 1
         pie.slices.strokeColor = colors.white
         
-        # Color slices
-        for i in range(len(pie.slices)):
-            if i == 0:
-                pie.slices[i].fillColor = colors.HexColor('#ef4444')
-            elif i == 1:
-                pie.slices[i].fillColor = colors.HexColor('#f97316')
-            else:
-                pie.slices[i].fillColor = colors.HexColor('#22c55e')
+        # Ensure slices exist and color them
+        try:
+            pie.slices[0].fillColor = colors.HexColor('#ef4444')
+            pie.slices[1].fillColor = colors.HexColor('#f97316')
+            pie.slices[2].fillColor = colors.HexColor('#22c55e')
+        except:
+            pass
         
-        drawing.add(pie)
+        pie_drawing.add(pie)
+        elements.append(pie_drawing)
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph("Pie Chart: Ticket Status Distribution", ParagraphStyle('ChartLabel', parent=styles['BodyText'], fontSize=10, textColor=colors.darkblue, alignment=1)))
+        elements.append(Spacer(1, 20))
         
         # Bar Chart
+        bar_drawing = Drawing(400, 250)
         bar = VerticalBarChart()
-        bar.x = 240
+        bar.x = 40
         bar.y = 40
-        bar.width = 230
-        bar.height = 170
+        bar.width = 320
+        bar.height = 180
         bar.data = [[open_count, in_progress_count, closed_count]]
         bar.categoryAxis.categoryNames = ['Open', 'In Progress', 'Closed']
         bar.valueAxis.valueMin = 0
-        bar.valueAxis.valueMax = max(total_tickets, 1) * 1.1
-        bar.barWidth = 25
+        bar.valueAxis.valueMax = max(total_tickets, 1) * 1.2
+        bar.barWidth = 30
+        bar.groupSpacing = 0.5
         
-        # Style the bars
-        bar.bars[0][0].fillColor = colors.HexColor('#ef4444')
-        bar.bars[0][1].fillColor = colors.HexColor('#f97316')
-        bar.bars[0][2].fillColor = colors.HexColor('#22c55e')
+        # Style bars - set each bar color
+        if len(bar.bars) > 0 and len(bar.bars[0]) > 0:
+            for i in range(min(3, len(bar.bars[0]))):
+                if i == 0:
+                    bar.bars[0][i].fillColor = colors.HexColor('#ef4444')
+                elif i == 1:
+                    bar.bars[0][i].fillColor = colors.HexColor('#f97316')
+                elif i == 2:
+                    bar.bars[0][i].fillColor = colors.HexColor('#22c55e')
         
-        # Add some padding and labels
-        bar.categoryAxis.labels.angle = 0
-        bar.title = "Ticket Status Distribution"
-        
-        drawing.add(bar)
-        
-        elements.append(drawing)
+        bar_drawing.add(bar)
+        elements.append(bar_drawing)
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph("Bar Chart: Ticket Volume by Status", ParagraphStyle('ChartLabel', parent=styles['BodyText'], fontSize=10, textColor=colors.darkblue, alignment=1)))
         elements.append(Spacer(1, 15))
-        elements.append(Paragraph("Pie chart (left) shows proportion of ticket states. Bar chart (right) displays volume comparison.", ParagraphStyle('VisualNote', parent=styles['BodyText'], fontSize=10, textColor=colors.grey, spaceAfter=10)))
+        elements.append(Paragraph("Charts show ticket distribution: pie chart displays proportions, bar chart shows absolute quantities.", ParagraphStyle('ChartNote', parent=styles['BodyText'], fontSize=9, textColor=colors.grey)))
     else:
         elements.append(Paragraph("No ticket data available for visualization.", normal_style))
     
