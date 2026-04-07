@@ -843,21 +843,27 @@ def generate_pdf_report(department, date_from, date_to):
     
     if insights:
         for insight in insights:
-            insight_color = colors.HexColor('#10b981') if insight['type'] == 'positive' else (colors.HexColor('#f59e0b') if insight['type'] == 'warning' else colors.HexColor('#ef4444'))
+            if insight['type'] == 'positive':
+                insight_color = colors.Color(0.06, 0.78, 0.63)  # Green
+            elif insight['type'] == 'warning':
+                insight_color = colors.Color(0.96, 0.62, 0.34)  # Orange
+            else:
+                insight_color = colors.Color(0.94, 0.27, 0.27)  # Red
             
-            insight_box = Table([[
-                Paragraph(f"<b>{insight['title']}</b><br/>{insight['message']}", ParagraphStyle('InsightText', parent=styles['BodyText'], fontSize=10, textColor=colors.white))
-            ]], colWidths=[6.5*inch])
+            insight_text = Paragraph(f"<b>{insight['title']}</b><br/>{insight['message']}", ParagraphStyle('InsightText', parent=styles['BodyText'], fontSize=10, textColor=colors.whitesmoke, leading=14))
+            
+            insight_box = Table([[insight_text]], colWidths=[6.5*inch], rowHeights=[None])
             insight_box.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), insight_color),
-                ('BOX', (0, 0), (-1, -1), 0.5, colors.white),
+                ('BORDER', (0, 0), (-1, -1), 1, colors.white),
                 ('LEFTPADDING', (0, 0), (-1, -1), 12),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-                ('TOPPADDING', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ]))
             elements.append(insight_box)
-            elements.append(Spacer(1, 10))
+            elements.append(Spacer(1, 12))
     else:
         elements.append(Paragraph("No insights generated. More data is needed for analysis.", normal_style))
     
@@ -928,61 +934,57 @@ def generate_pdf_report(department, date_from, date_to):
     
     if total_tickets > 0:
         # Pie Chart
-        pie_drawing = Drawing(280, 220)
+        pie_drawing = Drawing(300, 250)
         pie = Pie()
-        pie.x = 30
-        pie.y = 30
-        pie.width = 180
-        pie.height = 180
-        pie.data = [open_count if open_count > 0 else 1, in_progress_count if in_progress_count > 0 else 1, closed_count if closed_count > 0 else 1]
+        pie.x = 40
+        pie.y = 40
+        pie.width = 200
+        pie.height = 200
+        pie.data = [max(open_count, 1), max(in_progress_count, 1), max(closed_count, 1)]
         pie.labels = ['Open', 'In Progress', 'Closed']
-        pie.slices.strokeWidth = 1
+        pie.slices.strokeWidth = 2
         pie.slices.strokeColor = colors.white
         
-        # Ensure slices exist and color them
-        try:
-            pie.slices[0].fillColor = colors.HexColor('#ef4444')
-            pie.slices[1].fillColor = colors.HexColor('#f97316')
-            pie.slices[2].fillColor = colors.HexColor('#22c55e')
-        except:
-            pass
+        # Set slice colors with RGB values
+        slice_colors = [colors.Color(0.94, 0.27, 0.27), colors.Color(0.98, 0.45, 0.09), colors.Color(0.25, 0.78, 0.47)]
+        for i in range(min(3, len(pie.slices))):
+            pie.slices[i].fillColor = slice_colors[i]
         
         pie_drawing.add(pie)
         elements.append(pie_drawing)
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph("Pie Chart: Ticket Status Distribution", ParagraphStyle('ChartLabel', parent=styles['BodyText'], fontSize=10, textColor=colors.darkblue, alignment=1)))
-        elements.append(Spacer(1, 20))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("<b>Pie Chart: Ticket Status Distribution</b>", ParagraphStyle('ChartLabel', parent=styles['BodyText'], fontSize=11, textColor=colors.darkblue, alignment=1)))
+        elements.append(Spacer(1, 25))
         
         # Bar Chart
-        bar_drawing = Drawing(400, 250)
+        bar_drawing = Drawing(450, 280)
         bar = VerticalBarChart()
-        bar.x = 40
-        bar.y = 40
-        bar.width = 320
-        bar.height = 180
+        bar.x = 45
+        bar.y = 45
+        bar.width = 350
+        bar.height = 200
         bar.data = [[open_count, in_progress_count, closed_count]]
         bar.categoryAxis.categoryNames = ['Open', 'In Progress', 'Closed']
         bar.valueAxis.valueMin = 0
-        bar.valueAxis.valueMax = max(total_tickets, 1) * 1.2
-        bar.barWidth = 30
-        bar.groupSpacing = 0.5
+        bar.valueAxis.valueMax = int(max(total_tickets, 1) * 1.3) + 1
+        bar.barWidth = 35
+        bar.groupSpacing = 20
+        bar.strokeColor = colors.black
         
-        # Style bars - set each bar color
-        if len(bar.bars) > 0 and len(bar.bars[0]) > 0:
+        # Style bars - set each bar with RGB colors
+        bar_colors = [colors.Color(0.94, 0.27, 0.27), colors.Color(0.98, 0.45, 0.09), colors.Color(0.25, 0.78, 0.47)]
+        try:
             for i in range(min(3, len(bar.bars[0]))):
-                if i == 0:
-                    bar.bars[0][i].fillColor = colors.HexColor('#ef4444')
-                elif i == 1:
-                    bar.bars[0][i].fillColor = colors.HexColor('#f97316')
-                elif i == 2:
-                    bar.bars[0][i].fillColor = colors.HexColor('#22c55e')
+                bar.bars[0][i].fillColor = bar_colors[i]
+        except:
+            pass
         
         bar_drawing.add(bar)
         elements.append(bar_drawing)
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph("Bar Chart: Ticket Volume by Status", ParagraphStyle('ChartLabel', parent=styles['BodyText'], fontSize=10, textColor=colors.darkblue, alignment=1)))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("<b>Bar Chart: Ticket Volume by Status</b>", ParagraphStyle('ChartLabel', parent=styles['BodyText'], fontSize=11, textColor=colors.darkblue, alignment=1)))
         elements.append(Spacer(1, 15))
-        elements.append(Paragraph("Charts show ticket distribution: pie chart displays proportions, bar chart shows absolute quantities.", ParagraphStyle('ChartNote', parent=styles['BodyText'], fontSize=9, textColor=colors.grey)))
+        elements.append(Paragraph("Pie chart (left) shows proportion of ticket states. Bar chart (right) displays volume. Colors: Red=Open, Orange=In Progress, Green=Closed.", ParagraphStyle('ChartNote', parent=styles['BodyText'], fontSize=9, textColor=colors.grey, leading=12)))
     else:
         elements.append(Paragraph("No ticket data available for visualization.", normal_style))
     
