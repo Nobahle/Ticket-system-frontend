@@ -6,9 +6,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.piecharts import Pie
+from reportlab.graphics.charts.barcharts import VerticalBarChart
 import openpyxl
 from io import BytesIO
 
@@ -683,18 +686,36 @@ def generate_pdf_report(department, date_from, date_to):
     elements.append(Spacer(1, 15))
     
     # Key metrics
-    exec_summary = f"""
-    This report provides a comprehensive analysis of ticket system performance for the selected period.
+    summary_title = Paragraph("This report provides a comprehensive analysis of ticket system performance for the selected period.", ParagraphStyle('SummaryTitle', parent=styles['BodyText'], fontSize=12, leading=16, spaceAfter=15))
+    elements.append(summary_title)
     
-    <b>Key Performance Indicators:</b>
-    • Total Tickets Processed: {total_tickets}
-    • Current Open Tickets: {open_count}
-    • Tickets In Progress: {in_progress_count}
-    • Successfully Resolved: {closed_count}
-    • Overall Closure Rate: {f"{(closed_count / total_tickets * 100):.1f}%" if total_tickets > 0 else "0%"}
-    • Departments Covered: {len(dept_stats)}
-    """
-    elements.append(Paragraph(exec_summary, normal_style))
+    metrics = [
+        ('Total Tickets', str(total_tickets), colors.HexColor('#3b82f6')),
+        ('Open Tickets', str(open_count), colors.HexColor('#ef4444')),
+        ('In Progress', str(in_progress_count), colors.HexColor('#f59e0b')),
+        ('Closed Tickets', str(closed_count), colors.HexColor('#10b981')),
+        ('Closure Rate', f"{(closed_count / total_tickets * 100):.1f}%" if total_tickets > 0 else '0%', colors.HexColor('#6366f1'))
+    ]
+    
+    card_cells = []
+    for label, value, bg in metrics:
+        card = Table([
+            [Paragraph(f"<b>{label}</b>", ParagraphStyle('CardLabel', parent=styles['BodyText'], fontSize=9, textColor=colors.white))],
+            [Paragraph(value, ParagraphStyle('CardValue', parent=styles['BodyText'], fontSize=16, textColor=colors.white))]
+        ], colWidths=2.1*inch)
+        card.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), bg),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.white),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        card_cells.append(card)
+    
+    elements.append(Table([card_cells], colWidths=[2.1*inch] * len(card_cells), hAlign='LEFT', spaceBefore=10, spaceAfter=20))
+    elements.append(Spacer(1, 5))
+    elements.append(Paragraph("Key performance indicators are shown in the cards above. These summarize ticket volume, urgency, and closure success.", ParagraphStyle('SummaryFooter', parent=styles['BodyText'], fontSize=10, textColor=colors.grey, spaceAfter=10)))
     elements.append(PageBreak())
     
     # ===== DEPARTMENT OVERVIEW =====
@@ -760,26 +781,59 @@ def generate_pdf_report(department, date_from, date_to):
     elements.append(Paragraph("VISUAL BREAKDOWN", title_style))
     elements.append(Spacer(1, 20))
     
-    # Status Distribution Pie Chart
     if total_tickets > 0:
-        drawing = Drawing(400, 200)
+        drawing = Drawing(500, 280)
+        
+        # Pie Chart
         pie = Pie()
-        pie.x = 150
+        pie.x = 30
         pie.y = 50
-        pie.width = 100
-        pie.height = 100
-        pie.data = [open_count, in_progress_count, closed_count]
+        pie.width = 150
+        pie.height = 150
+        pie.data = [open_count if open_count > 0 else 0.1, in_progress_count if in_progress_count > 0 else 0.1, closed_count if closed_count > 0 else 0.1]
         pie.labels = ['Open', 'In Progress', 'Closed']
-        pie.slices.strokeWidth = 1
-        pie.slices[0].fillColor = colors.red
-        pie.slices[1].fillColor = colors.orange
-        pie.slices[2].fillColor = colors.green
+        pie.slices.strokeWidth = 0.5
+        pie.slices.strokeColor = colors.white
+        
+        # Color slices
+        for i in range(len(pie.slices)):
+            if i == 0:
+                pie.slices[i].fillColor = colors.HexColor('#ef4444')
+            elif i == 1:
+                pie.slices[i].fillColor = colors.HexColor('#f97316')
+            else:
+                pie.slices[i].fillColor = colors.HexColor('#22c55e')
+        
         drawing.add(pie)
+        
+        # Bar Chart
+        bar = VerticalBarChart()
+        bar.x = 240
+        bar.y = 40
+        bar.width = 230
+        bar.height = 170
+        bar.data = [[open_count, in_progress_count, closed_count]]
+        bar.categoryAxis.categoryNames = ['Open', 'In Progress', 'Closed']
+        bar.valueAxis.valueMin = 0
+        bar.valueAxis.valueMax = max(total_tickets, 1) * 1.1
+        bar.barWidth = 25
+        
+        # Style the bars
+        bar.bars[0][0].fillColor = colors.HexColor('#ef4444')
+        bar.bars[0][1].fillColor = colors.HexColor('#f97316')
+        bar.bars[0][2].fillColor = colors.HexColor('#22c55e')
+        
+        # Add some padding and labels
+        bar.categoryAxis.labels.angle = 0
+        bar.title = "Ticket Status Distribution"
+        
+        drawing.add(bar)
+        
         elements.append(drawing)
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph("Ticket Status Distribution", heading2_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("Pie chart (left) shows proportion of ticket states. Bar chart (right) displays volume comparison.", ParagraphStyle('VisualNote', parent=styles['BodyText'], fontSize=10, textColor=colors.grey, spaceAfter=10)))
     else:
-        elements.append(Paragraph("No ticket data available for visualization", normal_style))
+        elements.append(Paragraph("No ticket data available for visualization.", normal_style))
     
     elements.append(PageBreak())
     
