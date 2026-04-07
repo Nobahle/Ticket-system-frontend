@@ -602,20 +602,27 @@ def reports():
 
 # Generate PDF Report
 def generate_pdf_report(department, date_from, date_to):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.graphics.shapes import Drawing
+    from reportlab.graphics.charts.piecharts import Pie
+    from reportlab.graphics.charts.barcharts import VerticalBarChart
+    from reportlab.graphics import renderPDF
+    
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=0.5*inch, rightMargin=0.5*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
     styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=24, spaceAfter=30, alignment=1)
+    heading1_style = ParagraphStyle('Heading1', parent=styles['Heading1'], fontSize=18, spaceAfter=20, textColor=colors.darkblue)
+    heading2_style = ParagraphStyle('Heading2', parent=styles['Heading2'], fontSize=14, spaceAfter=15, textColor=colors.darkgreen)
+    normal_style = styles['Normal']
+    
     elements = []
-    
-    # Title
-    title = Paragraph(f"Ticket System Report - {department} Department", styles['Title'])
-    elements.append(title)
-    elements.append(Spacer(1, 12))
-    
-    # Date range
-    date_range = f"Period: {date_from} to {date_to}" if date_from and date_to else "All time"
-    elements.append(Paragraph(date_range, styles['Normal']))
-    elements.append(Spacer(1, 12))
     
     # Get data
     conn = get_db()
@@ -644,66 +651,222 @@ def generate_pdf_report(department, date_from, date_to):
     cursor.execute(query, params)
     tickets = cursor.fetchall()
     
-    # Summary stats
+    # Calculate statistics
     total_tickets = len(tickets)
     open_count = sum(1 for t in tickets if t[4] == 'Open')
     in_progress_count = sum(1 for t in tickets if t[4] == 'In Progress')
     closed_count = sum(1 for t in tickets if t[4] == 'Closed')
     
-    # Summary table
-    summary_data = [
-        ['Metric', 'Value'],
-        ['Total Tickets', str(total_tickets)],
-        ['Open', str(open_count)],
-        ['In Progress', str(in_progress_count)],
-        ['Closed', str(closed_count)]
-    ]
+    # Department breakdown
+    dept_stats = {}
+    for ticket in tickets:
+        dept = ticket[2] if ticket[2] else 'Unassigned'
+        if dept not in dept_stats:
+            dept_stats[dept] = {'total': 0, 'open': 0, 'in_progress': 0, 'closed': 0}
+        dept_stats[dept]['total'] += 1
+        if ticket[4] == 'Open':
+            dept_stats[dept]['open'] += 1
+        elif ticket[4] == 'In Progress':
+            dept_stats[dept]['in_progress'] += 1
+        elif ticket[4] == 'Closed':
+            dept_stats[dept]['closed'] += 1
     
-    summary_table = Table(summary_data)
-    summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 14),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    
-    elements.append(Paragraph("Summary", styles['Heading2']))
-    elements.append(summary_table)
+    # ===== EXECUTIVE SUMMARY =====
+    elements.append(Paragraph("EXECUTIVE SUMMARY", title_style))
     elements.append(Spacer(1, 20))
     
-    # Tickets table
+    report_title = f"Ticket System Performance Report - {department} Department"
+    elements.append(Paragraph(report_title, heading1_style))
+    
+    date_range = f"Report Period: {date_from} to {date_to}" if date_from and date_to else "Report Period: All Time"
+    elements.append(Paragraph(date_range, normal_style))
+    elements.append(Spacer(1, 15))
+    
+    # Key metrics
+    exec_summary = f"""
+    This report provides a comprehensive analysis of ticket system performance for the selected period.
+    
+    <b>Key Performance Indicators:</b>
+    • Total Tickets Processed: {total_tickets}
+    • Current Open Tickets: {open_count}
+    • Tickets In Progress: {in_progress_count}
+    • Successfully Resolved: {closed_count}
+    • Overall Closure Rate: {f"{(closed_count / total_tickets * 100):.1f}%" if total_tickets > 0 else "0%"}
+    • Departments Covered: {len(dept_stats)}
+    """
+    elements.append(Paragraph(exec_summary, normal_style))
+    elements.append(PageBreak())
+    
+    # ===== DEPARTMENT OVERVIEW =====
+    elements.append(Paragraph("DEPARTMENT OVERVIEW", title_style))
+    elements.append(Spacer(1, 20))
+    
+    # Overall statistics table
+    overview_data = [
+        ['Metric', 'Count', 'Percentage'],
+        ['Total Tickets', str(total_tickets), '100%'],
+        ['Open Tickets', str(open_count), f"{(open_count/total_tickets*100):.1f}%" if total_tickets > 0 else "0%"],
+        ['In Progress', str(in_progress_count), f"{(in_progress_count/total_tickets*100):.1f}%" if total_tickets > 0 else "0%"],
+        ['Closed Tickets', str(closed_count), f"{(closed_count/total_tickets*100):.1f}%" if total_tickets > 0 else "0%"]
+    ]
+    
+    overview_table = Table(overview_data, colWidths=[2*inch, 1*inch, 1.5*inch])
+    overview_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+    ]))
+    
+    elements.append(overview_table)
+    elements.append(Spacer(1, 20))
+    
+    # Department breakdown table
+    dept_data = [['Department', 'Total', 'Open', 'In Progress', 'Closed', 'Closure Rate']]
+    for dept, stats in sorted(dept_stats.items()):
+        closure_rate = f"{(stats['closed']/stats['total']*100):.1f}%" if stats['total'] > 0 else "0%"
+        dept_data.append([
+            dept,
+            str(stats['total']),
+            str(stats['open']),
+            str(stats['in_progress']),
+            str(stats['closed']),
+            closure_rate
+        ])
+    
+    dept_table = Table(dept_data, colWidths=[1.5*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch, 1*inch])
+    dept_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+    ]))
+    
+    elements.append(Paragraph("Department Performance Breakdown", heading2_style))
+    elements.append(dept_table)
+    elements.append(PageBreak())
+    
+    # ===== VISUAL BREAKDOWN =====
+    elements.append(Paragraph("VISUAL BREAKDOWN", title_style))
+    elements.append(Spacer(1, 20))
+    
+    # Status Distribution Pie Chart
+    if total_tickets > 0:
+        drawing = Drawing(400, 200)
+        pie = Pie()
+        pie.x = 150
+        pie.y = 50
+        pie.width = 100
+        pie.height = 100
+        pie.data = [open_count, in_progress_count, closed_count]
+        pie.labels = ['Open', 'In Progress', 'Closed']
+        pie.slices.strokeWidth = 1
+        pie.slices[0].fillColor = colors.red
+        pie.slices[1].fillColor = colors.orange
+        pie.slices[2].fillColor = colors.green
+        drawing.add(pie)
+        elements.append(drawing)
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph("Ticket Status Distribution", heading2_style))
+    else:
+        elements.append(Paragraph("No ticket data available for visualization", normal_style))
+    
+    elements.append(PageBreak())
+    
+    # ===== DEPARTMENT DEEP-DIVE REPORTS =====
+    elements.append(Paragraph("DEPARTMENT DEEP-DIVE REPORTS", title_style))
+    elements.append(Spacer(1, 20))
+    
+    for dept, stats in sorted(dept_stats.items()):
+        elements.append(Paragraph(f"Department: {dept}", heading1_style))
+        
+        dept_summary = f"""
+        <b>Performance Summary for {dept}:</b><br/>
+        • Total Tickets: {stats['total']}<br/>
+        • Open Tickets: {stats['open']}<br/>
+        • In Progress: {stats['in_progress']}<br/>
+        • Closed Tickets: {stats['closed']}<br/>
+        • Closure Rate: {f"{(stats['closed']/stats['total']*100):.1f}%" if stats['total'] > 0 else "0%"}<br/>
+        """
+        elements.append(Paragraph(dept_summary, normal_style))
+        elements.append(Spacer(1, 15))
+        
+        # Department tickets table
+        dept_tickets = [t for t in tickets if (t[2] == dept or (dept == 'Unassigned' and not t[2]))]
+        if dept_tickets:
+            ticket_data = [['ID', 'Ticket Text', 'Status', 'Tone', 'Created', 'User']]
+            for ticket in dept_tickets[:20]:  # Limit to 20 per department
+                ticket_data.append([
+                    str(ticket[0]),
+                    ticket[1][:40] + '...' if len(ticket[1]) > 40 else ticket[1],
+                    ticket[4],
+                    ticket[3],
+                    ticket[5][:10],
+                    ticket[6] or 'System'
+                ])
+            
+            ticket_table = Table(ticket_data, colWidths=[0.5*inch, 2.5*inch, 0.8*inch, 0.8*inch, 1*inch, 1*inch])
+            ticket_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ]))
+            
+            elements.append(ticket_table)
+            elements.append(Spacer(1, 20))
+        
+        if dept != list(sorted(dept_stats.keys()))[-1]:  # Don't add page break after last department
+            elements.append(PageBreak())
+    
+    # ===== COMPLETE TICKET LOG =====
+    elements.append(Paragraph("COMPLETE TICKET LOG", title_style))
+    elements.append(Spacer(1, 20))
+    
     if tickets:
-        ticket_data = [['ID', 'Ticket Text', 'Category', 'Tone', 'Status', 'Created', 'User']]
-        for ticket in tickets[:50]:  # Limit to 50 for PDF
-            ticket_data.append([
+        log_data = [['ID', 'Ticket Text', 'Department', 'Status', 'Tone', 'Created', 'User']]
+        for ticket in tickets:
+            log_data.append([
                 str(ticket[0]),
                 ticket[1][:50] + '...' if len(ticket[1]) > 50 else ticket[1],
-                ticket[2],
-                ticket[3],
+                ticket[2] or 'Unassigned',
                 ticket[4],
-                ticket[5][:10],  # Date only
+                ticket[3],
+                ticket[5],
                 ticket[6] or 'System'
             ])
         
-        ticket_table = Table(ticket_data)
-        ticket_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        log_table = Table(log_data, colWidths=[0.4*inch, 2.5*inch, 1*inch, 0.7*inch, 0.7*inch, 1.2*inch, 1*inch])
+        log_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkred),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
         ]))
         
-        elements.append(Paragraph("Ticket Details", styles['Heading2']))
-        elements.append(ticket_table)
+        elements.append(log_table)
+    else:
+        elements.append(Paragraph("No tickets found for the selected criteria.", normal_style))
     
     conn.close()
     
@@ -713,7 +876,7 @@ def generate_pdf_report(department, date_from, date_to):
     return send_file(
         buffer,
         as_attachment=True,
-        download_name=f"ticket_report_{department}_{datetime.now().strftime('%Y%m%d')}.pdf",
+        download_name=f"executive_report_{department}_{datetime.now().strftime('%Y%m%d')}.pdf",
         mimetype='application/pdf'
     )
 
