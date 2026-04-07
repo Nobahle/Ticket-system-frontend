@@ -1150,6 +1150,16 @@ def generate_csv_report(department, date_from, date_to):
         mimetype='text/csv'
     )
 
+# REPORTS - Admin only
+@app.route("/reports")
+@login_required
+@admin_required
+def reports():
+    return render_template("reports.html", 
+                         username=session['username'], 
+                         role=session['role'], 
+                         departments=DEPARTMENTS)
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
